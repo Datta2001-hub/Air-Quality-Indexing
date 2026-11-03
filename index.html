@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AirSource – Air quality monitoring and source attribution</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f6f5;--surface:#fff;--ink:#14231f;--mute:#5b6b66;--line:#d7e0dd;--haze:#6fbf73;--accent:#0f6e5c;
+--c-veh:#3b82c4;--c-ind:#8a63c9;--c-bio:#d9822b;--c-dust:#b39b5e;--c-sec:#4aa59a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1816;--surface:#16231f;--ink:#e6f0ec;--mute:#93a69f;--line:#27382f;--accent:#5fd1b5}}
+:root[data-theme="dark"]{--bg:#0e1816;--surface:#16231f;--ink:#e6f0ec;--mute:#93a69f;--line:#27382f;--accent:#5fd1b5}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}
+.sky{background:linear-gradient(180deg,var(--haze),var(--bg) 92%);transition:background .6s}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.5rem;margin:0;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--ink);opacity:.8;margin:2px 0 16px;max-width:60ch}
+.hero{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;margin-bottom:8px}
+.aqi{font-size:clamp(4.5rem,16vw,7.5rem);font-weight:800;line-height:.9;letter-spacing:-.05em}
+.cat{font-size:1.2rem;font-weight:600}
+.adv{max-width:44ch;font-size:.95rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h2{font-size:1rem;margin:0 0 10px;font-weight:600}
+.full{grid-column:1/-1}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+button,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer}
+button.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sl{display:grid;grid-template-columns:90px 1fr 64px;gap:8px;align-items:center;font-size:.9rem;margin:6px 0}
+.sl input{width:100%;accent-color:var(--accent)}
+.sl b{text-align:right;font-weight:600}
+.bar{display:grid;grid-template-columns:110px 1fr 46px;gap:8px;align-items:center;margin:8px 0;font-size:.92rem}
+.track{height:14px;background:var(--line);border-radius:7px;overflow:hidden}
+.fill{height:100%;border-radius:7px;transition:width .4s}
+.why{font-size:.9rem;color:var(--mute);margin:12px 0 0}
+.top{font-size:1.05rem;margin:0 0 10px}
+svg{width:100%;height:auto;display:block}
+.note{font-size:.82rem;color:var(--mute);margin-top:18px}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:.8rem;margin:2px 4px 2px 0}
+</style>
+</head>
+<body>
+<div class="sky" id="sky"><div class="wrap" style="padding-bottom:0">
+<h1>AirSource</h1>
+<p class="sub">Live air quality readings from a sensor station, plus an estimate of where the pollution is most likely coming from.</p>
+<div class="row" id="stations"></div>
+<div class="hero"><div><div class="aqi" id="aqi">0</div><div class="cat" id="cat"></div></div><div class="adv" id="adv"></div></div>
+</div></div>
+
+<div class="wrap" style="padding-top:8px">
+<div class="grid">
+ <div class="card">
+  <h2>Sensor readings</h2>
+  <div class="row"><button id="live">Start live feed</button><button id="reset">Reset station</button></div>
+  <div id="sliders"></div>
+  <h2 style="margin-top:14px">Try a scenario</h2>
+  <div class="row" id="presets"></div>
+ </div>
+ <div class="card">
+  <h2>Likely pollution sources</h2>
+  <p class="top" id="top"></p>
+  <div id="bars"></div>
+  <p class="why" id="why"></p>
+ </div>
+ <div class="card full">
+  <h2>PM2.5 over 24 hours (modelled from current reading)</h2>
+  <svg id="trend" viewBox="0 0 800 200" role="img" aria-label="PM2.5 trend over 24 hours"></svg>
+ </div>
+ <div class="card full">
+  <h2>How the attribution works</h2>
+  <p class="why" style="margin-top:0">Each pollutant is a fingerprint. Nitrogen dioxide and carbon monoxide at rush hour point to vehicles. Sulphur dioxide points to coal and industry. A high PM2.5 to PM10 ratio with carbon monoxide points to burning, while a low ratio with coarse particles points to dust. Ozone and a smooth afternoon haze point to secondary pollution formed in the air. Each source gets a score from these rules and the scores are converted to shares.</p>
+  <span class="tag">Rule-based fingerprinting</span><span class="tag">AQI from PM2.5 (US EPA bands)</span><span class="tag">Simulated sensor data</span>
+  <p class="note">Demo data is simulated. To go live, replace the station values with a feed from OpenAQ or CPCB, and replace the rules with a receptor model (PMF) or a classifier trained on labelled events.</p>
+ </div>
+</div></div>
+
+<script>
+const F={pm25:["PM2.5",0,400,"µg/m³"],pm10:["PM10",0,600,"µg/m³"],no2:["NO₂",0,200,"ppb"],so2:["SO₂",0,150,"ppb"],co:["CO",0,10,"ppm"],o3:["Ozone",0,200,"ppb"],hour:["Hour",0,23,":00"]};
+const STN={
+ "Traffic junction":{pm25:78,pm10:120,no2:85,so2:8,co:3.2,o3:30,hour:9},
+ "Industrial estate":{pm25:95,pm10:140,no2:45,so2:70,co:1.6,o3:35,hour:14},
+ "Residential park":{pm25:32,pm10:55,no2:18,so2:4,co:0.7,o3:60,hour:16},
+ "Construction zone":{pm25:70,pm10:260,no2:30,so2:6,co:1.0,o3:40,hour:12}};
+const PRE={
+ "Rush hour":{pm25:90,pm10:130,no2:110,so2:9,co:4.5,o3:25,hour:18},
+ "Crop burning":{pm25:240,pm10:290,no2:40,so2:12,co:6.5,o3:20,hour:22},
+ "Factory plume":{pm25:110,pm10:150,no2:50,so2:105,co:1.8,o3:30,hour:13},
+ "Dusty day":{pm25:80,pm10:420,no2:25,so2:5,co:0.8,o3:45,hour:12},
+ "Clean morning":{pm25:9,pm10:18,no2:8,so2:2,co:0.3,o3:40,hour:6}};
+const SRC=[["Vehicles","--c-veh"],["Industry and coal","--c-ind"],["Biomass burning","--c-bio"],["Road and construction dust","--c-dust"],["Secondary haze","--c-sec"]];
+const BANDS=[[12,0,50,"Good","#6fbf73","Air is clean. Enjoy outdoor activity."],[35.4,51,100,"Moderate","#d6c94a","Sensitive people should limit long outdoor effort."],[55.4,101,150,"Unhealthy for sensitive groups","#e9a23b","Children, elders and people with asthma should reduce time outdoors."],[150.4,151,200,"Unhealthy","#e0603f","Everyone should reduce outdoor exertion. Wear an N95 outside."],[250.4,201,300,"Very unhealthy","#a8479a","Stay indoors, run an air purifier, avoid exercise outside."],[500.4,301,500,"Hazardous","#7a2336","Health emergency. Stay indoors and seal gaps."]];
+let cur,base,timer=null,stationName="Traffic junction";
+
+function aqiOf(c){let lo=0;for(const b of BANDS){if(c<=b[0]){return{v:Math.round((b[2]-b[1])/(b[0]-lo+.1)*(c-lo)+b[1]),b}}lo=b[0]+.1}return{v:500,b:BANDS[5]}}
+function attribute(d){
+ const pm10=Math.max(d.pm10,d.pm25),r=d.pm25/pm10,h=d.hour;
+ const rush=(h>=7&&h<=10)||(h>=17&&h<=21)?1:0,day=h>=11&&h<=17?1:0,night=h>=20||h<=5?1:0;
+ const s=[
+  d.no2/60+d.co/3*.5+rush*.6,
+  d.so2/35*1.3+d.no2/120*.3,
+  Math.max(0,r-.5)*3+d.co/3*.7+d.pm25/150*.4+night*.3,
+  (1-r)*2.2+Math.max(0,pm10-100)/150,
+  d.o3/90*.7+day*.4+.15];
+ const m=s.map(x=>Math.max(.05,x)),t=m.reduce((a,b)=>a+b,0);
+ return m.map(x=>x/t);
+}
+function why(d,p){
+ const r=d.pm25/Math.max(d.pm10,d.pm25),i=p.indexOf(Math.max(...p)),out=[];
+ if(i===0)out.push("NO₂ is "+(d.no2>60?"high":"elevated")+" for the hour"+(((d.hour>=7&&d.hour<=10)||(d.hour>=17&&d.hour<=21))?", which falls in rush hour":""));
+ if(i===1)out.push("SO₂ is far above normal city levels, a typical coal or industrial marker");
+ if(i===2)out.push("PM2.5 makes up "+Math.round(r*100)+"% of PM10 and CO is raised, which matches smoke from burning");
+ if(i===3)out.push("PM2.5 is only "+Math.round(r*100)+"% of PM10, so most particles are coarse, which matches dust");
+ if(i===4)out.push("no strong primary marker stands out, so aged and chemically formed particles dominate");
+ return "Why: "+out[0]+". Shares are estimates from sensor patterns, not source measurements.";
+}
+function render(){
+ const d=cur,a=aqiOf(d.pm25),p=attribute(d);
+ document.getElementById("aqi").textContent=a.v;
+ document.getElementById("cat").textContent=a.b[3];
+ document.getElementById("adv").textContent=a.b[5];
+ document.getElementById("sky").style.setProperty("--haze",a.b[4]);
+ const i=p.indexOf(Math.max(...p));
+ document.getElementById("top").textContent="Main contributor: "+SRC[i][0]+" ("+Math.round(p[i]*100)+"%)";
+ document.getElementById("bars").innerHTML=SRC.map((s,k)=>`<div class="bar"><span>${s[0]}</span><div class="track"><div class="fill" style="width:${p[k]*100}%;background:var(${s[1]})"></div></div><b>${Math.round(p[k]*100)}%</b></div>`).join("");
+ document.getElementById("why").textContent=why(d,p);
+ for(const k in F){const e=document.getElementById("v_"+k);if(e){e.textContent=(k==="co"?(+d[k]).toFixed(1):Math.round(d[k]))+" "+(k==="hour"?":00":F[k][3]);document.getElementById("i_"+k).value=d[k]}}
+ trend(d,a);
+}
+function trend(d,a){
+ const prof=h=>1+.4*Math.exp(-((h-8.5)**2)/6)+.5*Math.exp(-((h-20)**2)/8)-.25*Math.exp(-((h-15)**2)/10);
+ const pts=[...Array(24)].map((_,h)=>d.pm25*prof(h)/prof(d.hour)),mx=Math.max(...pts,60)*1.1;
+ const X=h=>40+h*(740/23),Y=v=>170-v/mx*150;
+ let g="";[0,.5,1].forEach(f=>{const y=Y(mx*f/1.1);g+=`<line x1="40" x2="780" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="34" y="${y+4}" text-anchor="end" font-size="11" fill="var(--mute)">${Math.round(mx*f/1.1)}</text>`});
+ for(let h=0;h<24;h+=3)g+=`<text x="${X(h)}" y="192" text-anchor="middle" font-size="11" fill="var(--mute)">${h}:00</text>`;
+ const line=pts.map((v,h)=>(h?"L":"M")+X(h)+" "+Y(v)).join(" ");
+ g+=`<path d="${line} L${X(23)} 170 L${X(0)} 170Z" fill="${a.b[4]}" opacity=".22"/><path d="${line}" fill="none" stroke="${a.b[4]}" stroke-width="3"/>`;
+ g+=`<circle cx="${X(d.hour)}" cy="${Y(pts[d.hour])}" r="6" fill="var(--ink)"/>`;
+ document.getElementById("trend").innerHTML=g;
+}
+function setData(o){cur={...o};render()}
+function build(){
+ const st=document.getElementById("stations");
+ st.innerHTML=Object.keys(STN).map(n=>`<button data-s="${n}" class="${n===stationName?"on":""}">${n}</button>`).join("");
+ st.onclick=e=>{const n=e.target.dataset.s;if(!n)return;stationName=n;base=STN[n];[...st.children].forEach(b=>b.classList.toggle("on",b.dataset.s===n));setData(base)};
+ document.getElementById("sliders").innerHTML=Object.keys(F).map(k=>`<div class="sl"><label for="i_${k}">${F[k][0]}</label><input type="range" id="i_${k}" min="${F[k][1]}" max="${F[k][2]}" step="${k==="co"?.1:1}"><b id="v_${k}"></b></div>`).join("");
+ for(const k in F)document.getElementById("i_"+k).oninput=e=>{cur[k]=+e.target.value;render()};
+ document.getElementById("presets").innerHTML=Object.keys(PRE).map(n=>`<button data-p="${n}">${n}</button>`).join("");
+ document.getElementById("presets").onclick=e=>{const n=e.target.dataset.p;if(n)setData(PRE[n])};
+ document.getElementById("reset").onclick=()=>setData(base);
+ document.getElementById("live").onclick=e=>{
+  if(timer){clearInterval(timer);timer=null;e.target.textContent="Start live feed";e.target.classList.remove("on");return}
+  e.target.textContent="Stop live feed";e.target.classList.add("on");
+  timer=setInterval(()=>{for(const k of["pm25","pm10","no2","so2","co","o3"]){const sp=F[k][2];cur[k]=Math.min(sp,Math.max(0,cur[k]*(1+(Math.random()-.5)*.12)))}
+   cur.pm10=Math.max(cur.pm10,cur.pm25);render()},1500)};
+}
+base=STN[stationName];build();setData(base);
+</script>
+</body>
+</html>
